@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:unique_name_generator/unique_name_generator.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:io_page/assets/icons/custom_icons_icons.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:developer';
 
 void main() {
   runApp(MyApp());
@@ -31,74 +34,201 @@ class MyApp extends StatelessWidget {
 }
 
 class MyAppState extends ChangeNotifier {
-  var ung = UniqueNameGenerator(
-    dictionaries: [adjectives, animals],
-    style: NameStyle.capital,
-    separator: '',
-  );
 
-  var current = '';
-
-  MyAppState() {
-    current = ung.generate();
-  }
-
-  void getNext() {
-    current = ung.generate();
-    notifyListeners();
-  }
 }
 
 class MyHomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    var appState = context.watch<MyAppState>();
-    var robotName = appState.current;
 
-    IconData icon = Icons.copy;
-
-    // style for the text
-    var style = Theme.of(context).textTheme.bodyLarge!.copyWith(
-      color: Theme.of(context).colorScheme.onPrimaryContainer,
-    );
-
-    // copy the name to clipboard
-    void copyName() async {
-      Clipboard.setData(ClipboardData(text: robotName)).then((_){
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Name copied to clipboard")));
-      });
-    }
+    final scrollController = ScrollController();
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-      body: Center(
+      body: LayoutBuilder(builder: (context, constraints) {
+        return Scrollbar(
+          thumbVisibility: true,
+          controller: scrollController,
+          child: SingleChildScrollView(
+            controller: scrollController,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SplashScreenWidget(constraints: constraints),
+                    Footer(context: context, constraints: constraints),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      }),
+    );
+  }
+}
+
+class Footer extends StatelessWidget {
+  const Footer({
+    Key? key,
+    required this.context,
+    required this.constraints,
+  }) : super(key: key);
+
+  final BuildContext context;
+  final BoxConstraints constraints;
+
+  copyText(String text) async {
+    Clipboard.setData(ClipboardData(text: text)).then((_) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("Copied to clipboard")));
+    });
+  }
+
+  void _sendMailTo() async {
+    const emailId = 'vamsikalagaturu@gmail.com';
+    final Uri uri = Uri(
+      scheme: 'mailto',
+      path: emailId,
+    );
+
+    if (kIsWeb) {
+      // get the platform
+      var platform = Theme.of(context).platform;
+
+      if (platform == TargetPlatform.linux ||
+          platform == TargetPlatform.windows ||
+          platform == TargetPlatform.macOS) {
+        await copyText(emailId);
+      } else {
+        // if the platform is not web, open the mail app
+        if (!await launchUrl(uri, mode: LaunchMode.platformDefault)) {
+          await copyText(emailId);
+          throw 'Could not launch $uri';
+        }
+      }
+    } else {
+      // NOT running on the web! You can check for additional platforms here.
+      if (!await launchUrl(uri, mode: LaunchMode.platformDefault)) {
+        await copyText(emailId);
+        throw 'Could not launch $uri';
+      }
+    }
+  }
+
+  // flexible widget to show the footer
+  Widget _footerItem(String text, IconData icon, {Function? onTap}) {
+    return Flexible(
+      child: InkWell(
+        onTap: onTap as void Function()?,
+        child: SizedBox(
+          width: constraints.maxWidth / 3,
+          height: constraints.maxHeight / 3,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 25,
+                color: Theme.of(context).colorScheme.onPrimaryContainer,
+              ),
+              SizedBox(height: 10),
+              Text(
+                text,
+                style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: constraints.maxWidth,
+      height: constraints.maxHeight / 10,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _footerItem('Github', CustomIcons.github_mark, onTap: () {
+            launchUrl(Uri.parse('vamsikalagaturu.github.io'));
+          }),
+          _footerItem('Email', Icons.email, onTap: () {
+            _sendMailTo();
+          }),
+          _footerItem('LinkedIn', CustomIcons.linkedin_squared, onTap: () {
+            launchUrl(
+                Uri.parse('https://www.linkedin.com/in/vamsikalagaturu/'));
+          }),
+          _footerItem('Twitter', CustomIcons.logo_black, onTap: () {
+            launchUrl(Uri.parse('https://twitter.com/vamsikalagaturu'));
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+class SplashScreenWidget extends StatelessWidget {
+  SplashScreenWidget({
+    Key? key,
+    required this.constraints,
+  }) : super(key: key);
+
+  final BoxConstraints constraints;
+
+  // theme for the Name
+  final TextStyle nameStyle = TextStyle(
+      color: Colors.white,
+      fontSize: 40,
+      fontWeight: FontWeight.bold,
+      shadows: [
+        Shadow(color: Colors.black, blurRadius: 8, offset: Offset(10, 10))
+      ]);
+
+  // theme for the title
+  final TextStyle titleStyle = TextStyle(
+      color: Colors.white,
+      fontSize: 20,
+      fontWeight: FontWeight.bold,
+      shadows: [
+        Shadow(color: Colors.black, blurRadius: 8, offset: Offset(10, 10))
+      ]);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: constraints.maxWidth,
+      height: constraints.maxHeight,
+      decoration: BoxDecoration(
+        image: DecorationImage(
+          image: AssetImage('assets/images/italy_blur.jpg'),
+          fit: BoxFit.cover,
+        ),
+      ),
+      child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('The page is still under development, meanwhile enjoy this '
-                  'random robot name generator :)', style: style),
-            SizedBox(height: 10),
-            BigCard(robotName: robotName),
-            SizedBox(height: 10),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ElevatedButton(
-                  onPressed: () {
-                    appState.getNext();
-                  },
-                  child: Text('Generate'),
-                ),
-                SizedBox(width: 10),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    copyName();
-                  },
-                  icon: Icon(icon),
-                  label: Text('Copy'),
-                ),
-              ],
+            Material(
+              shape: const CircleBorder(side: BorderSide.none),
+              elevation: 15,
+              shadowColor: Colors.deepOrange,
+              child: CircleAvatar(
+                radius: 100,
+                backgroundImage: AssetImage('assets/images/dp.jpg'),
+              ),
             ),
+            SizedBox(height: 10),
+            Text('Vamsi Kalagaturu', style: nameStyle),
+            SizedBox(height: 10),
+            Text('Roboticist', style: titleStyle),
           ],
         ),
       ),
