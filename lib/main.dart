@@ -1,4 +1,7 @@
+import 'dart:async';
 import 'dart:js';
+import 'dart:math' as math;
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
@@ -21,55 +24,70 @@ void main() {
   ));
 }
 
-GoRouter router(context) {
-  // print the current path
-  print('Current dirs : ${Provider.of<MyAppState>(context, listen: false).dirs}');
+class MyApp extends StatelessWidget {
+  GoRouter router(var dirs) {
+    return GoRouter(
+      // set the initial path
+      initialLocation: '/',
 
-  List dirs = Provider.of<MyAppState>(context, listen: false).dirs;
+      // redirect from / to /home/
+      redirect: (context, state) {
+        print('Redirecting to: ${state.location}');
 
-  return GoRouter(
-    // set the initial path
-    initialLocation: '/',
+        if (state.location == '/home' || state.location == '/') {
+          return '/';
+        }
 
-    // redirect from / to /home/
-    redirect: (context, state) => state.location == '/home' ? '/' : null,
+        return state.location;
+      },
 
-    // set the path to home page
-    routes: [
-      GoRoute(
-          name: 'home',
-          path: '/',
+      // set the path to home page
+      routes: _routes(dirs),
+
+      // set the path to unknown page
+      errorPageBuilder: (context, state) {
+        return MaterialPage(child: MyNextPage('404', show404: true));
+      },
+    );
+  }
+
+  List<GoRoute> _routes(dirs) => [
+        GoRoute(
+          name: '404',
+          path: '/404',
           pageBuilder: (context, state) {
-            return MaterialPage(child: MyHomePage());
+            return MaterialPage(child: MyNextPage('404', show404: true));
           },
-          routes: [
-            for (var dir in dirs)
+        ),
+        GoRoute(
+            name: 'home',
+            path: '/',
+            pageBuilder: (context, state) {
+              return MaterialPage(child: MyHomePage());
+            },
+            routes: [
               GoRoute(
-                name: dir['name'],
-                path: dir['path'],
+                path: ':command',
                 pageBuilder: (context, state) {
-                  return MaterialPage(child: MyNextPage(state.path));
+                  return MaterialPage(
+                      child: MyNextPage(state.pathParameters['command']));
                 },
               ),
-          ]),
-      GoRoute(
-        path: '/404',
-        pageBuilder: (context, state) {
-          return MaterialPage(child: MyNextPage('/404', show404: true));
-        },
-      ),
-    ],
+              // watch for changes in dirs
+              for (var dir in dirs)
+                GoRoute(
+                  name: dir['name'],
+                  path: dir['path'],
+                  pageBuilder: (context, state) {
+                    return MaterialPage(child: MyNextPage(state.path));
+                  },
+                ),
+            ]),
+      ];
 
-    // set the path to unknown page
-    errorPageBuilder: (context, state) {
-      return MaterialPage(child: MyNextPage('/404', show404: true));
-    },
-  );
-}
-
-class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    var dirs = context.read<MyAppState>().dirs;
     return MaterialApp.router(
         title: 'Vamsi Kalagaturu',
         theme: ThemeData(
@@ -78,7 +96,7 @@ class MyApp extends StatelessWidget {
           brightness: Brightness.dark,
           colorSchemeSeed: Colors.blue,
         ),
-        routerConfig: router(context));
+        routerConfig: router(dirs));
   }
 }
 
@@ -155,9 +173,31 @@ class MyHomePage extends StatelessWidget {
     return Scaffold(
       // use hero widget for CustomSearchBar
       body: Center(
-        child: Hero(
-          tag: 'searchBar',
-          child: CustomSearchBar('~'),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Hero(
+              tag: 'searchBar',
+              child: CustomSearchBar('~'),
+            ),
+            SizedBox(
+              height: 10,
+            ),
+            Container(
+                constraints: BoxConstraints(
+                  minWidth: 300,
+                  minHeight: 300,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color.fromARGB(255, 94, 95, 96),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                // set height and width of the container dynamically
+                height: 300,
+                width: 300,
+                child: TwoLinkManipulator()),
+          ],
         ),
       ),
     );
@@ -190,68 +230,20 @@ class CustomSearchBar extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: Container(
               // set the padding
-              padding: const EdgeInsets.all(5),
+              padding: const EdgeInsets.fromLTRB(5, 10, 5, 5),
               // decoration
               decoration: BoxDecoration(
-                // set the color with the color set in the theme
-                // color: Theme.of(context).colorScheme.tertiaryContainer,
                 // set the border radius
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: RichText(
-                textAlign: TextAlign.left,
-                text: TextSpan(
-                  children: [
-                    TextSpan(
-                      text: '{ ',
-                      style: Theme.of(context).textTheme.titleLarge!.copyWith(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onPrimaryContainer,
-                          ),
+              child: Text(
+                // set the text
+                '{ Vamsi Kalagaturu } [ $path ]',
+                // set the style
+                style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                      // set the color with the color set in the theme
+                      color: Theme.of(context).colorScheme.onBackground,
                     ),
-                    TextSpan(
-                      text: 'Vamsi Kalagaturu',
-                      style: Theme.of(context).textTheme.titleLarge!.copyWith(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onPrimaryContainer,
-                          ),
-                    ),
-                    TextSpan(
-                      text: ' } ',
-                      style: Theme.of(context).textTheme.titleLarge!.copyWith(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onPrimaryContainer,
-                          ),
-                    ),
-                    TextSpan(
-                      text: ' [ ',
-                      style: Theme.of(context).textTheme.titleLarge!.copyWith(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onPrimaryContainer,
-                          ),
-                    ),
-                    TextSpan(
-                      text: path,
-                      style: Theme.of(context).textTheme.titleLarge!.copyWith(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onPrimaryContainer,
-                          ),
-                    ),
-                    TextSpan(
-                      text: ' ]',
-                      style: Theme.of(context).textTheme.titleLarge!.copyWith(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onPrimaryContainer,
-                          ),
-                    ),
-                  ],
-                ),
               ),
             ),
           ),
@@ -287,7 +279,7 @@ class CustomSearchBar extends StatelessWidget {
                     // add the text
                     Text(
                       '\$',
-                      style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                      style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                             color: Theme.of(context)
                                 .colorScheme
                                 .onSecondaryContainer,
@@ -313,8 +305,14 @@ class CustomSearchBar extends StatelessWidget {
                           focusNode: FocusNode(canRequestFocus: true),
                           decoration: InputDecoration(
                             border: InputBorder.none,
-                            contentPadding: const EdgeInsets.only(bottom: 3),
+                            contentPadding: const EdgeInsets.only(bottom: 1),
                           ),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium!.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSecondaryContainer,
+                                  ),
                           // on submit call the function
                           onSubmitted: (value) {
                             // call the function
@@ -351,18 +349,23 @@ _onSubmitted(BuildContext context, String value) {
 
     print('path is $path');
 
-    // get the current path
-    final currentPath = context.read<MyAppState>().currentPath;
+    List dirs = context.read<MyAppState>().dirs;
 
-    // if path is ~ then show the home page
-    if (path == '~') {
-      // go to home page
-      context.pushReplacementNamed('home');
-    } else if (path.startsWith('/')) {
-    } else if (path.startsWith('~/')) {
-    } else if (!path.contains('mkdir_')) {
+    bool isPath = false;
+
+    for (var dir in dirs) {
+      if (dir['name'] == path) {
+        isPath = true;
+        break;
+      }
+    }
+
+    if (isPath) {
       context.pushNamed(path);
-      // context.pushNamed('next', pathParameters: {'path': currentPath});
+    } else if (path.contains('ls')) {
+      context.push('/home:ls');
+    } else {
+      context.pushNamed('404');
     }
   }
 }
@@ -408,25 +411,9 @@ String interpretCommand(String value, BuildContext context) {
       return path;
     }
   }
-  // mkdir command
-  if (value.startsWith('mkdir')) {
-    // get the path
-    String path = value.substring(5).trim();
-    // check if the path is empty
-    if (path.isEmpty) {
-      // show the snackbar
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('mkdir: missing operand'),
-        ),
-      );
-      // don't update the path in appstate
-      return '';
-    } else {
-      // update the path in appstate
-      context.read<MyAppState>().addDir(path, path);
-      return 'mkdir_$path';
-    }
+  // ls command
+  if (value.startsWith('ls')) {
+    return 'ls';
   }
   // check if the value is help
   if (value == 'help') {
@@ -470,8 +457,10 @@ class CustomText extends StatelessWidget {
           maxHeight: MediaQuery.of(context).size.height * 0.9,
         ),
         // set the child
+        alignment: Alignment.center,
         child: Text(
           text,
+          textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                 color: Theme.of(context).colorScheme.onPrimaryContainer,
               ),
@@ -511,10 +500,25 @@ class MyNextPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // check if path doesnt end with /
+    print('path from MyNextPage: $path');
     String nPath = path!;
-    if (!path!.endsWith('/')) {
-      // remove the string after the last /
-      nPath = path!.substring(0, path!.lastIndexOf('/') + 1);
+    String cPath = path!;
+    if (path!.contains('ls')) {
+      List dirs = context.read<MyAppState>().dirs;
+      // get names of all the dirs and make a string
+      String dirNames = '';
+      for (var dir in dirs) {
+        dirNames += dir['name'] + '/\t';
+      }
+      cPath = 'ls: $dirNames';
+      // delete the string after :
+      nPath = nPath.substring(0, nPath.indexOf(':')).replaceFirst('home', '~');
+    } else if (path == '/') {
+      nPath = '~';
+      cPath = '~';
+    } else {
+      nPath = '~/$nPath';
+      cPath = '~/$nPath';
     }
     return WillPopScope(
       onWillPop: () => onBackPress(context),
@@ -546,10 +550,270 @@ class MyNextPage extends StatelessWidget {
                 // set width to 80% of screen width
                 width: 0.8 * MediaQuery.of(context).size.width,
                 // set the child
-                child: CustomText('result widget: $path')),
+                child: CustomText(cPath)),
           ),
         ],
       )),
     );
+  }
+}
+
+// animate a two link manipulator robot
+class TwoLinkManipulator extends StatefulWidget {
+  // set canvas width and height to parent widget width and height
+
+  // constructor
+  TwoLinkManipulator({Key? key}) : super(key: key);
+
+  @override
+  TwoLinkManipulatorState createState() => TwoLinkManipulatorState();
+}
+
+class TwoLinkManipulatorState extends State<TwoLinkManipulator>
+    with SingleTickerProviderStateMixin {
+  // animation controller
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  double _angle1 = 0;
+  double _angle2 = 0;
+
+  double _cursorX = 0;
+  double _cursorY = 0;
+
+  double _link1Length = 90;
+  double _link2Length = 50;
+  double _angle1Min = 0;
+  double _angle1Max = math.pi * 2;
+  double _angle2Min = -math.pi;
+  double _angle2Max = math.pi;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: 500),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _updateCursorPosition(PointerEvent event, BuildContext context) {
+    setState(() {
+      _cursorX = event.localPosition.dx;
+      _cursorY = event.localPosition.dy;
+    });
+    print('as cursorX: $_cursorX, cursorY: $_cursorY');
+    _animateToCursor(context);
+  }
+
+  // translate the cursor position to the manipulator world with origin at the center of the canvas
+  Offset _translateCursorPosition(width, height) {
+    print('cursorX: $_cursorX, cursorY: $_cursorY');
+    return Offset(
+      _cursorX - width / 2,
+      _cursorY - height / 2,
+    );
+  }
+
+  void _animateToCursor(BuildContext context) {
+    // get size of the parent widget
+    final size = context.size;
+
+    // animate the manipulator from the previous position to the current position
+    final initialAngle1 = _angle1;
+    final initialAngle2 = _angle2;
+
+    Offset ik = _calculateInverseKinematics(size?.width, size?.height);
+
+    final targetAngle1 = ik.dx;
+    final targetAngle2 = ik.dy;
+
+    _controller.reset();
+
+    _animation = Tween<double>(
+      begin: 0,
+      end: 1,
+    ).animate(_controller)
+      ..addListener(() {
+        setState(() {
+          _angle1 = lerpDouble(
+            initialAngle1,
+            targetAngle1,
+            _animation.value,
+          )!;
+          _angle2 = lerpDouble(
+            initialAngle2,
+            targetAngle2,
+            _animation.value,
+          )!;
+        });
+      });
+
+    _controller.forward();
+  }
+
+  Offset _calculateInverseKinematics(width, height) {
+    Offset cursorPosition = _translateCursorPosition(width, height);
+
+    double angle1 = math.atan2(cursorPosition.dy, cursorPosition.dx);
+    double angle2 = 0;
+
+    double distance = cursorPosition.distance;
+    double distanceSquared = distance * distance;
+
+    double link1LengthSquared = _link1Length * _link1Length;
+    double link2LengthSquared = _link2Length * _link2Length;
+
+    double cosAngle2 =
+        (distanceSquared - link1LengthSquared - link2LengthSquared) /
+            (2 * _link1Length * _link2Length);
+
+    if (cosAngle2 < -1 || cosAngle2 > 1) {
+      return Offset(angle1, angle2);
+    }
+
+    angle2 = math.acos(cosAngle2);
+
+    double sinAngle2 = math.sin(angle2);
+
+    double k1 = _link1Length + _link2Length * cosAngle2;
+
+    double k2 = _link2Length * sinAngle2;
+
+    angle1 = math.atan2(cursorPosition.dy * k1 - cursorPosition.dx * k2,
+        cursorPosition.dx * k1 + cursorPosition.dy * k2);
+
+    return Offset(angle1, angle2);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (context, constraints) {
+      return MouseRegion(
+        onHover: (event) => _updateCursorPosition(event, context),
+        cursor: SystemMouseCursors.none,
+        child: GestureDetector(
+          onTap: () => {
+            _updateCursorPosition,
+          },
+          child: CustomPaint(
+            size: Size.infinite,
+            painter: ManipulatorPainter(
+              angle1: _angle1,
+              angle2: _angle2,
+              cursorX: _cursorX,
+              cursorY: _cursorY,
+              link1Length: _link1Length,
+              link2Length: _link2Length,
+              angle1Min: _angle1Min,
+              angle1Max: _angle1Max,
+              angle2Min: _angle2Min,
+              angle2Max: _angle2Max,
+            ),
+          ),
+        ),
+      );
+    });
+  }
+}
+
+class ManipulatorPainter extends CustomPainter {
+  final double angle1;
+  final double angle2;
+  final double cursorX;
+  final double cursorY;
+  final double link1Length;
+  final double link2Length;
+  final double angle1Min;
+  final double angle1Max;
+  final double angle2Min;
+  final double angle2Max;
+
+  ManipulatorPainter(
+      {required this.angle1,
+      required this.angle2,
+      required this.cursorX,
+      required this.cursorY,
+      required this.link1Length,
+      required this.link2Length,
+      required this.angle1Min,
+      required this.angle1Max,
+      required this.angle2Min,
+      required this.angle2Max});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+
+    // Draw reachable workspace shade
+    final shadePaint = Paint()..color = Colors.blue.withOpacity(0.2);
+
+    // draw a hollow circle to represent the reachable workspace with
+    // inner radius = link1Length - link2Length
+    // outer radius = link1Length + link2Length
+
+    final double innerRadius = link1Length - link2Length;
+    final double outerRadius = link1Length + link2Length;
+
+    final shadeTransparentPaint = Paint()
+      ..color = Colors.yellow.withOpacity(0.2);
+
+    // draw the inner circle with transparent paint
+    canvas.drawCircle(
+      center,
+      innerRadius,
+      shadeTransparentPaint,
+    );
+
+    // draw the outer circle
+    canvas.drawCircle(
+      center,
+      outerRadius,
+      shadePaint,
+    );
+
+    // Draw links
+    final link1Paint = Paint()
+      ..color = Colors.black
+      ..strokeWidth = 5
+      ..style = PaintingStyle.stroke;
+
+    final link2Paint = Paint()
+      ..color = Colors.white
+      ..strokeWidth = 5
+      ..style = PaintingStyle.stroke;
+
+    final x1 = center.dx + link1Length * math.cos(angle1);
+    final y1 = center.dy + link1Length * math.sin(angle1);
+    final link1End = Offset(x1, y1);
+
+    final x2 = x1 + link2Length * math.cos(angle1 + angle2);
+    final y2 = y1 + link2Length * math.sin(angle1 + angle2);
+    final link2End = Offset(x2, y2);
+
+    canvas.drawLine(center, link1End, link1Paint);
+    canvas.drawLine(link1End, link2End, link2Paint);
+
+    // Draw cursor
+    final cursorPaint = Paint()
+      ..color = Colors.red
+      ..strokeWidth = 8
+      ..strokeCap = StrokeCap.round;
+    canvas.drawPoints(
+        PointMode.points, [Offset(cursorX, cursorY)], cursorPaint);
+  }
+
+  @override
+  bool shouldRepaint(ManipulatorPainter oldDelegate) {
+    return oldDelegate.angle1 != angle1 ||
+        oldDelegate.angle2 != angle2 ||
+        oldDelegate.cursorX != cursorX ||
+        oldDelegate.cursorY != cursorY;
   }
 }
