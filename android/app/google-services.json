@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "889907876477",
+    "project_id": "stellararm-link",
+    "storage_bucket": "stellararm-link.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:889907876477:android:1454297431bfce05fa5714",
+        "android_client_info": {
+          "package_name": "com.example.io_page"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBGlmoLADV43AfrjquHFz-EHPSifBOi_xA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

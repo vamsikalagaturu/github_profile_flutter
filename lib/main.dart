@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:js';
+import 'dart:js_util';
 import 'dart:math' as math;
 import 'dart:ui';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:flutter/services.dart';
@@ -12,6 +14,15 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:io_page/assets/icons/custom_icons_icons.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dirs.dart';
+
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import 'two_link_manipulator.dart';
+
+final FirebaseAuth _auth = FirebaseAuth.instance;
+final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
 void main() {
   // set the url strategy for web
@@ -102,6 +113,46 @@ class MyApp extends StatelessWidget {
 
 // app state class
 class MyAppState extends ChangeNotifier {
+  MyAppState() {
+    init();
+  }
+
+  bool _loggedIn = false;
+  bool get loggedIn => _loggedIn;
+
+  String _name = 'Vamsi Kalagaturu';
+
+  Future<void> init() async {
+    // initialize firebase
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+
+    _auth.authStateChanges().listen((User? user) {
+      if (user == null) {
+        print('User is currently signed out!');
+        _loggedIn = false;
+      } else {
+        _loggedIn = true;
+        print('User is signed in!');
+        // get the user name from firestore and update the name
+        _firestore.collection('users').doc(user.uid).get().then((doc) {
+          if (doc.exists) {
+            _name = doc.data()!['name'];
+            print('user name: $_name');
+            notifyListeners();
+          } else {
+            print('cant find username!');
+          }
+        });
+      }
+      notifyListeners();
+    });
+
+    // print documents in home collection
+    printDocs();
+  }
+
   // variable to store the current path
   String _currentPath = '~/';
 
@@ -116,10 +167,13 @@ class MyAppState extends ChangeNotifier {
     {'name': 'contact', 'path': 'contact'}
   ];
 
-  // function to add a new directory
-  void addDir(String name, String path) {
-    dirs.add({'name': name, 'path': path});
-    notifyListeners();
+  // print documents in home collection
+  Future<void> printDocs() async {
+    final QuerySnapshot<Map<String, dynamic>> docs =
+        await _firestore.collection('home').get();
+    for (var doc in docs.docs) {
+      print('${doc.id}, ${doc.data()}');
+    }
   }
 
   // function to update the current path
@@ -238,7 +292,7 @@ class CustomSearchBar extends StatelessWidget {
               ),
               child: Text(
                 // set the text
-                '{ Vamsi Kalagaturu } [ $path ]',
+                '{ ${context.watch<MyAppState>()._name} } [ $path ]',
                 // set the style
                 style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                       // set the color with the color set in the theme
@@ -364,10 +418,110 @@ _onSubmitted(BuildContext context, String value) {
       context.pushNamed(path);
     } else if (path.contains('ls')) {
       context.push('/home:ls');
+    } else if (path == 'sudo su') {
+      // display modal
+      _showLoginModal(context, 'vamsik8919@gmail.com');
+    } else if (path.startsWith('user_login_')) {
+      // display modal
+      _showLoginModal(context, path.split('_')[2]);
     } else {
       context.pushNamed('404');
     }
   }
+}
+
+void _showLoginModal(BuildContext context, String email) {
+  showModalBottomSheet(
+    context: context,
+    builder: (context) {
+      return Container(
+        height: 200,
+        width: 300,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(10),
+            topRight: Radius.circular(10),
+          ),
+          color: Theme.of(context).colorScheme.primaryContainer,
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // add the text
+              Text(
+                'Enter Password',
+                style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    ),
+              ),
+              // add the vertical space
+              SizedBox(height: 10),
+              // add the input field
+              SizedBox(
+                width: 200,
+                child: TextField(
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    contentPadding: const EdgeInsets.fromLTRB(10, 0, 10, 0),
+                  ),
+                  style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+                      ),
+                  autofocus: true,
+                  // on submit call the function
+                  onSubmitted: (value) {
+                    // call the function
+                    _onUserLoginDataSubmitted(context, email, value)
+                        .then((value) {
+                      if (value) {
+                        // close the modal
+                        Navigator.pop(context);
+                      } else {
+                        // show the snackbar
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Wrong Password'),
+                          ),
+                        );
+                      }
+                    });
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+// on user login data submitted
+Future<bool> _onUserLoginDataSubmitted(
+    BuildContext context, String email, String password) async {
+  // try to login the user
+  try {
+    final credential = await _auth.signInWithEmailAndPassword(
+        email: email, password: password);
+    // if login is successful then close the modal
+    if (credential.user != null) {
+      // close the modal
+      return true;
+    }
+  } on FirebaseAuthException catch (e) {
+    if (e.code == 'user-not-found') {
+      print('No user found for that email.');
+    } else if (e.code == 'wrong-password') {
+      print('Wrong password provided for that user.');
+    }
+    return false;
+  }
+  return false;
 }
 
 // interpret the command method and returns List containing result widget and isPath
@@ -414,6 +568,15 @@ String interpretCommand(String value, BuildContext context) {
   // ls command
   if (value.startsWith('ls')) {
     return 'ls';
+  }
+  // sudo su command
+  if (value.startsWith('sudo su')) {
+    return 'sudo su';
+  }
+  // for other users
+  if (value.startsWith('su -')) {
+    var email = value.substring(4).trim();
+    return 'user_login_$email';
   }
   // check if the value is help
   if (value == 'help') {
@@ -558,262 +721,3 @@ class MyNextPage extends StatelessWidget {
   }
 }
 
-// animate a two link manipulator robot
-class TwoLinkManipulator extends StatefulWidget {
-  // set canvas width and height to parent widget width and height
-
-  // constructor
-  TwoLinkManipulator({Key? key}) : super(key: key);
-
-  @override
-  TwoLinkManipulatorState createState() => TwoLinkManipulatorState();
-}
-
-class TwoLinkManipulatorState extends State<TwoLinkManipulator>
-    with SingleTickerProviderStateMixin {
-  // animation controller
-  late AnimationController _controller;
-  late Animation<double> _animation;
-
-  double _angle1 = 0;
-  double _angle2 = 0;
-
-  double _cursorX = 0;
-  double _cursorY = 0;
-
-  double _link1Length = 90;
-  double _link2Length = 50;
-  double _angle1Min = 0;
-  double _angle1Max = math.pi * 2;
-  double _angle2Min = -math.pi;
-  double _angle2Max = math.pi;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: Duration(milliseconds: 500),
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _updateCursorPosition(PointerEvent event, BuildContext context) {
-    setState(() {
-      _cursorX = event.localPosition.dx;
-      _cursorY = event.localPosition.dy;
-    });
-    print('as cursorX: $_cursorX, cursorY: $_cursorY');
-    _animateToCursor(context);
-  }
-
-  // translate the cursor position to the manipulator world with origin at the center of the canvas
-  Offset _translateCursorPosition(width, height) {
-    print('cursorX: $_cursorX, cursorY: $_cursorY');
-    return Offset(
-      _cursorX - width / 2,
-      _cursorY - height / 2,
-    );
-  }
-
-  void _animateToCursor(BuildContext context) {
-    // get size of the parent widget
-    final size = context.size;
-
-    // animate the manipulator from the previous position to the current position
-    final initialAngle1 = _angle1;
-    final initialAngle2 = _angle2;
-
-    Offset ik = _calculateInverseKinematics(size?.width, size?.height);
-
-    final targetAngle1 = ik.dx;
-    final targetAngle2 = ik.dy;
-
-    _controller.reset();
-
-    _animation = Tween<double>(
-      begin: 0,
-      end: 1,
-    ).animate(_controller)
-      ..addListener(() {
-        setState(() {
-          _angle1 = lerpDouble(
-            initialAngle1,
-            targetAngle1,
-            _animation.value,
-          )!;
-          _angle2 = lerpDouble(
-            initialAngle2,
-            targetAngle2,
-            _animation.value,
-          )!;
-        });
-      });
-
-    _controller.forward();
-  }
-
-  Offset _calculateInverseKinematics(width, height) {
-    Offset cursorPosition = _translateCursorPosition(width, height);
-
-    double angle1 = math.atan2(cursorPosition.dy, cursorPosition.dx);
-    double angle2 = 0;
-
-    double distance = cursorPosition.distance;
-    double distanceSquared = distance * distance;
-
-    double link1LengthSquared = _link1Length * _link1Length;
-    double link2LengthSquared = _link2Length * _link2Length;
-
-    double cosAngle2 =
-        (distanceSquared - link1LengthSquared - link2LengthSquared) /
-            (2 * _link1Length * _link2Length);
-
-    if (cosAngle2 < -1 || cosAngle2 > 1) {
-      return Offset(angle1, angle2);
-    }
-
-    angle2 = math.acos(cosAngle2);
-
-    double sinAngle2 = math.sin(angle2);
-
-    double k1 = _link1Length + _link2Length * cosAngle2;
-
-    double k2 = _link2Length * sinAngle2;
-
-    angle1 = math.atan2(cursorPosition.dy * k1 - cursorPosition.dx * k2,
-        cursorPosition.dx * k1 + cursorPosition.dy * k2);
-
-    return Offset(angle1, angle2);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (context, constraints) {
-      return MouseRegion(
-        onHover: (event) => _updateCursorPosition(event, context),
-        cursor: SystemMouseCursors.none,
-        child: GestureDetector(
-          onTap: () => {
-            _updateCursorPosition,
-          },
-          child: CustomPaint(
-            size: Size.infinite,
-            painter: ManipulatorPainter(
-              angle1: _angle1,
-              angle2: _angle2,
-              cursorX: _cursorX,
-              cursorY: _cursorY,
-              link1Length: _link1Length,
-              link2Length: _link2Length,
-              angle1Min: _angle1Min,
-              angle1Max: _angle1Max,
-              angle2Min: _angle2Min,
-              angle2Max: _angle2Max,
-            ),
-          ),
-        ),
-      );
-    });
-  }
-}
-
-class ManipulatorPainter extends CustomPainter {
-  final double angle1;
-  final double angle2;
-  final double cursorX;
-  final double cursorY;
-  final double link1Length;
-  final double link2Length;
-  final double angle1Min;
-  final double angle1Max;
-  final double angle2Min;
-  final double angle2Max;
-
-  ManipulatorPainter(
-      {required this.angle1,
-      required this.angle2,
-      required this.cursorX,
-      required this.cursorY,
-      required this.link1Length,
-      required this.link2Length,
-      required this.angle1Min,
-      required this.angle1Max,
-      required this.angle2Min,
-      required this.angle2Max});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-
-    // Draw reachable workspace shade
-    final shadePaint = Paint()..color = Colors.blue.withOpacity(0.2);
-
-    // draw a hollow circle to represent the reachable workspace with
-    // inner radius = link1Length - link2Length
-    // outer radius = link1Length + link2Length
-
-    final double innerRadius = link1Length - link2Length;
-    final double outerRadius = link1Length + link2Length;
-
-    final shadeTransparentPaint = Paint()
-      ..color = Colors.yellow.withOpacity(0.2);
-
-    // draw the inner circle with transparent paint
-    canvas.drawCircle(
-      center,
-      innerRadius,
-      shadeTransparentPaint,
-    );
-
-    // draw the outer circle
-    canvas.drawCircle(
-      center,
-      outerRadius,
-      shadePaint,
-    );
-
-    // Draw links
-    final link1Paint = Paint()
-      ..color = Colors.black
-      ..strokeWidth = 5
-      ..style = PaintingStyle.stroke;
-
-    final link2Paint = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 5
-      ..style = PaintingStyle.stroke;
-
-    final x1 = center.dx + link1Length * math.cos(angle1);
-    final y1 = center.dy + link1Length * math.sin(angle1);
-    final link1End = Offset(x1, y1);
-
-    final x2 = x1 + link2Length * math.cos(angle1 + angle2);
-    final y2 = y1 + link2Length * math.sin(angle1 + angle2);
-    final link2End = Offset(x2, y2);
-
-    canvas.drawLine(center, link1End, link1Paint);
-    canvas.drawLine(link1End, link2End, link2Paint);
-
-    // Draw cursor
-    final cursorPaint = Paint()
-      ..color = Colors.red
-      ..strokeWidth = 8
-      ..strokeCap = StrokeCap.round;
-    canvas.drawPoints(
-        PointMode.points, [Offset(cursorX, cursorY)], cursorPaint);
-  }
-
-  @override
-  bool shouldRepaint(ManipulatorPainter oldDelegate) {
-    return oldDelegate.angle1 != angle1 ||
-        oldDelegate.angle2 != angle2 ||
-        oldDelegate.cursorX != cursorX ||
-        oldDelegate.cursorY != cursorY;
-  }
-}
