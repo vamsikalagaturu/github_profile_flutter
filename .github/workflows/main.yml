@@ -1,0 +1,54 @@
+# workflow to build the flutter web app and deploy it to vamsikalagaturu.github.io repository
+name: Build and Deploy to Github io
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+    build:
+        name: Build
+        runs-on: ubuntu-latest
+        
+        steps:
+        - name: Checkout
+          uses: actions/checkout@v2
+        
+        - name: Setup Flutter
+          uses: subosito/flutter-action@v1
+          with:
+            flutter-version: '2.0.6'
+        
+        - name: Get Packages
+          run: flutter pub get
+
+        - name: Build Web
+          run: flutter build web
+
+        - name: Upload build files
+          uses: actions/upload-artifact@v2
+          with:
+            name: build-files
+            path: ./build/web
+
+    deploy:
+        name: Deploy
+        needs: build
+        runs-on: ubuntu-latest
+
+        steps:
+        - name: Checkout
+          uses: actions/checkout@v2
+
+        - name: Push files to vamsikalagaturu.github.io repository
+          uses: cpina/github-action-push-to-another-repository@main
+          env:
+            API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+          with:
+            source-directory: 'build/web'
+            destination-github-username: 'vamsikalagaturu'
+            destination-repository-name: 'vamsikalagaturu.github.io'
+            user-email: 'vamsikalagaturu@gmail.com'
+            target-branch: 'main'
+
