@@ -44,12 +44,18 @@ jobs:
         - name: Checkout
           uses: actions/checkout@v2
 
+        - name: Download build files
+          uses: actions/download-artifact@v2
+          with:
+            name: build-files
+            path: ./build/web
+
         - name: Push files to vamsikalagaturu.github.io repository
           uses: cpina/github-action-push-to-another-repository@main
           env:
             API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
           with:
-            source-directory: 'build/web'
+            source-directory: './build/web'
             destination-github-username: 'vamsikalagaturu'
             destination-repository-name: 'vamsikalagaturu.github.io'
             user-email: 'vamsikalagaturu@gmail.com'
