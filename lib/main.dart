@@ -1,8 +1,4 @@
 import 'dart:async';
-import 'dart:js';
-import 'dart:js_util';
-import 'dart:math' as math;
-import 'dart:ui';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -20,13 +16,19 @@ import 'firebase_options.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'two_link_manipulator.dart';
+import 'notes.dart';
 
 final FirebaseAuth _auth = FirebaseAuth.instance;
 final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-void main() {
+void main() async {
   // set the url strategy for web
   usePathUrlStrategy();
+  WidgetsFlutterBinding.ensureInitialized();
+  // initialize firebase
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(
       // use provider and change notifier
       ChangeNotifierProvider(
@@ -49,6 +51,17 @@ class MyApp extends StatelessWidget {
           return '/';
         }
 
+        // if path is /notes check if user is logged in
+        if (state.location == '/notes') {
+          print(
+              'Logged in from redirect: ${context.read<MyAppState>().loggedIn}');
+          if (context.read<MyAppState>().loggedIn) {
+            return state.location;
+          } else {
+            return '/404';
+          }
+        }
+
         return state.location;
       },
 
@@ -57,7 +70,8 @@ class MyApp extends StatelessWidget {
 
       // set the path to unknown page
       errorPageBuilder: (context, state) {
-        return MaterialPage(child: MyNextPage('404', show404: true));
+        return MaterialPage(
+            child: MyNextPage('404', resultWidget: Container(), show404: true));
       },
     );
   }
@@ -67,7 +81,9 @@ class MyApp extends StatelessWidget {
           name: '404',
           path: '/404',
           pageBuilder: (context, state) {
-            return MaterialPage(child: MyNextPage('404', show404: true));
+            return MaterialPage(
+                child: MyNextPage('404',
+                    resultWidget: Container(), show404: true));
           },
         ),
         GoRoute(
@@ -78,10 +94,27 @@ class MyApp extends StatelessWidget {
             },
             routes: [
               GoRoute(
+                name: 'notes',
+                path: 'notes',
+                pageBuilder: (context, state) {
+                  // check if user is logged in
+                  print(
+                      'Logged in from builder: ${context.read<MyAppState>().loggedIn}');
+                  return MaterialPage(
+                      child: MyNextPage(
+                        state.path,
+                        resultWidget: NotesGrid(
+                          firestore: _firestore, uid: _auth.currentUser!.uid),
+                      ));
+                },
+              ),
+              GoRoute(
                 path: ':command',
                 pageBuilder: (context, state) {
                   return MaterialPage(
-                      child: MyNextPage(state.pathParameters['command']));
+                      child: MyNextPage(state.pathParameters['command'],
+                          resultWidget: Center(
+                              child: Text(state.pathParameters['command']!))));
                 },
               ),
               // watch for changes in dirs
@@ -90,7 +123,9 @@ class MyApp extends StatelessWidget {
                   name: dir['name'],
                   path: dir['path'],
                   pageBuilder: (context, state) {
-                    return MaterialPage(child: MyNextPage(state.path));
+                    return MaterialPage(
+                        child: MyNextPage(state.path,
+                            resultWidget: Center(child: Text(dir['name']))));
                   },
                 ),
             ]),
@@ -121,13 +156,11 @@ class MyAppState extends ChangeNotifier {
   bool get loggedIn => _loggedIn;
 
   String _name = 'Vamsi Kalagaturu';
+  String _email = '';
 
-  Future<void> init() async {
-    // initialize firebase
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+  late CollectionReference<Note> uNotesRef;
 
+  void init() {
     _auth.authStateChanges().listen((User? user) {
       if (user == null) {
         print('User is currently signed out!');
@@ -135,6 +168,17 @@ class MyAppState extends ChangeNotifier {
       } else {
         _loggedIn = true;
         print('User is signed in!');
+        _email = user.email!;
+        // docref for user notes
+        uNotesRef = _firestore
+            .collection('users')
+            .doc(_auth.currentUser!.uid)
+            .collection('notes')
+            .withConverter<Note>(
+              fromFirestore: Note.fromFirestore,
+              toFirestore: (note, options) =>
+                  note.toFirestore(_firestore, _auth.currentUser!.uid),
+            );
         // get the user name from firestore and update the name
         _firestore.collection('users').doc(user.uid).get().then((doc) {
           if (doc.exists) {
@@ -153,6 +197,26 @@ class MyAppState extends ChangeNotifier {
     printDocs();
   }
 
+  // function to update user name
+  bool updateName(String name) {
+    bool success = false;
+    _firestore
+        .collection('users')
+        .doc(_auth.currentUser!.uid)
+        .update({'name': name})
+        .then((value) => {
+              print('name updated to $name'),
+              _name = name,
+              notifyListeners(),
+              success = true,
+            })
+        .onError((error, stackTrace) => {
+              print('Failed to update name: $error'),
+              success = false,
+            });
+    return success;
+  }
+
   // variable to store the current path
   String _currentPath = '~/';
 
@@ -167,6 +231,9 @@ class MyAppState extends ChangeNotifier {
     {'name': 'contact', 'path': 'contact'}
   ];
 
+  // define the controller for the text field of terminal
+  final TextEditingController _terminalTextController = TextEditingController();
+
   // print documents in home collection
   Future<void> printDocs() async {
     final QuerySnapshot<Map<String, dynamic>> docs =
@@ -174,6 +241,26 @@ class MyAppState extends ChangeNotifier {
     for (var doc in docs.docs) {
       print('${doc.id}, ${doc.data()}');
     }
+  }
+
+  // create a new note
+  Future<void> createNewNote(Note newNote) async {
+    await uNotesRef.add(newNote);
+  }
+
+  // update a note
+  Future<void> updateNote(Note note) async {
+    await uNotesRef
+        .doc(note.id)
+        .update(note.toFirestore(_firestore, _auth.currentUser!.uid));
+  }
+
+  // get all notes
+  Stream<List<Note>> getNotes() {
+    return uNotesRef
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) => doc.data()).toList());
   }
 
   // function to update the current path
@@ -356,6 +443,10 @@ class CustomSearchBar extends StatelessWidget {
                         },
                         // set the child
                         child: TextField(
+                          // set the controller
+                          controller: context
+                              .watch<MyAppState>()
+                              ._terminalTextController,
                           focusNode: FocusNode(canRequestFocus: true),
                           decoration: InputDecoration(
                             border: InputBorder.none,
@@ -414,7 +505,9 @@ _onSubmitted(BuildContext context, String value) {
       }
     }
 
-    if (isPath) {
+    if (path == 'notes') {
+      context.pushNamed('notes');
+    } else if (isPath) {
       context.pushNamed(path);
     } else if (path.contains('ls')) {
       context.push('/home:ls');
@@ -424,10 +517,55 @@ _onSubmitted(BuildContext context, String value) {
     } else if (path.startsWith('user_login_')) {
       // display modal
       _showLoginModal(context, path.split('_')[2]);
+    } else if (path.startsWith('passwd_reset')) {
+      // if the user is logged in, show a popup to notify the user
+      if (context.read<MyAppState>()._loggedIn) {
+        // show the snackbar
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Password reset link sent to your email!, '
+                'Follow the instructions in the email to reset your password'),
+          ),
+        );
+        // send the reset link to the email
+        _auth.sendPasswordResetEmail(email: context.read<MyAppState>()._email);
+      } else {
+        // display modal
+        _showLoginModal(context, '');
+      }
+    } else if (path == 'logout') {
+      // logout the user
+      _auth.signOut();
+      // show the snackbar
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Logged out successfully!'),
+        ),
+      );
+    } else if (path.contains('sudo usermod -l')) {
+      // update the name
+      if (context.read<MyAppState>().updateName(path.split(' ')[3])) {
+        // show the snackbar
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Name updated successfully!'),
+          ),
+        );
+      } else {
+        // show the snackbar
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Name update failed!'),
+          ),
+        );
+      }
     } else {
       context.pushNamed('404');
     }
   }
+
+  // clear the text field
+  context.read<MyAppState>()._terminalTextController.clear();
 }
 
 void _showLoginModal(BuildContext context, String email) {
@@ -472,7 +610,6 @@ void _showLoginModal(BuildContext context, String email) {
                   style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                         color: Theme.of(context).colorScheme.onPrimaryContainer,
                       ),
-                  autofocus: true,
                   // on submit call the function
                   onSubmitted: (value) {
                     // call the function
@@ -578,6 +715,19 @@ String interpretCommand(String value, BuildContext context) {
     var email = value.substring(4).trim();
     return 'user_login_$email';
   }
+  // to reset password
+  if (value.startsWith('sudo passwd reset')) {
+    return 'passwd_reset';
+  }
+  // to logout
+  if (value.startsWith('logout')) {
+    return 'logout';
+  }
+  // update user data
+  if (value.startsWith('sudo usermod -l')) {
+    var uName = value.substring(16).trim();
+    return 'user_update_$uName';
+  }
   // check if the value is help
   if (value == 'help') {
     //  update the path in appstate
@@ -653,35 +803,37 @@ Future<bool> onBackPress(BuildContext context) async {
 // MyNextPage widget class that takes the result widget
 class MyNextPage extends StatelessWidget {
   // constructor
-  MyNextPage(this.path, {this.show404 = false, Key? key}) : super(key: key);
+  MyNextPage(this.path,
+      {required this.resultWidget, this.show404 = false, Key? key})
+      : super(key: key);
 
   // path
   final String? path;
   // show404
   final bool show404;
+  // result widget
+  final Widget resultWidget;
+
+  // 404 widget
+  Widget get error404Widget => Center(
+        child: CustomText(
+          '404: Page not found',
+          key: const Key('404'),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
     // check if path doesnt end with /
     print('path from MyNextPage: $path');
     String nPath = path!;
-    String cPath = path!;
     if (path!.contains('ls')) {
-      List dirs = context.read<MyAppState>().dirs;
-      // get names of all the dirs and make a string
-      String dirNames = '';
-      for (var dir in dirs) {
-        dirNames += dir['name'] + '/\t';
-      }
-      cPath = 'ls: $dirNames';
       // delete the string after :
       nPath = nPath.substring(0, nPath.indexOf(':')).replaceFirst('home', '~');
     } else if (path == '/') {
       nPath = '~';
-      cPath = '~';
     } else {
       nPath = '~/$nPath';
-      cPath = '~/$nPath';
     }
     return WillPopScope(
       onWillPop: () => onBackPress(context),
@@ -706,18 +858,15 @@ class MyNextPage extends StatelessWidget {
             toolbarHeight: 100,
           ),
           // add the result widget
-          SliverFillRemaining(
+          SliverToBoxAdapter(
             child: SizedBox(
-                // set height to 80% of screen height
-                height: 0.8 * MediaQuery.of(context).size.height,
-                // set width to 80% of screen width
-                width: 0.8 * MediaQuery.of(context).size.width,
-                // set the child
-                child: CustomText(cPath)),
+              height: 300,
+              width: 300,
+              child: show404 ? error404Widget : resultWidget,
+            ),
           ),
         ],
       )),
     );
   }
 }
-
