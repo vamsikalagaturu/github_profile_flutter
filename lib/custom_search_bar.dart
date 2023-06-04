@@ -44,7 +44,7 @@ class CustomSearchBar extends StatelessWidget {
               ),
               child: Text(
                 // set the text
-                '{ ${Provider.of<MyAppState>(context, listen: false).name} } [ $path ]',
+                '{ ${Provider.of<MyAppState>(context).name} } [ $path ]',
                 // set the style
                 style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                       // set the color with the color set in the theme
