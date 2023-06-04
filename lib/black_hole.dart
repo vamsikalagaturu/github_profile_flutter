@@ -70,6 +70,13 @@ class BlackholeButtonState extends State<BlackholeButton>
           child: DragTarget(
             onAccept: (data) {
               onAcceptMethod(data, context);
+              _reverseAnimation();
+            },
+            onWillAccept: (_) {
+              _startAnimation();
+            },
+            onLeave: () {
+              _reverseAnimation();
             },
             builder: (_, __, child) {
               return Center(
