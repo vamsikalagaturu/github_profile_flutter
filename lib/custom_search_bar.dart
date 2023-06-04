@@ -208,28 +208,13 @@ _onSubmitted(BuildContext context, String value, Function? touchMethod) {
           content: Text('Logged out successfully!'),
         ),
       );
-    } else if (path.contains('sudo usermod -l')) {
+    } else if (path.contains('user_update_')) {
       // update the name
-      if (context.read<MyAppState>().updateName(path.split(' ')[3])) {
-        // show the snackbar
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Name updated successfully!'),
-          ),
-        );
-      } else {
-        // show the snackbar
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Name update failed!'),
-          ),
-        );
-      }
+      context.read<MyAppState>().updateName(path.split('_')[2]);
     } else if (path == 'touch') {
       touchMethod!();
     } else if (path == 'help') {
-      context.push(
-          Uri(path: '/home/help').toString());
+      context.push(Uri(path: '/home/help').toString());
     } else {
       context.pushNamed('404');
     }

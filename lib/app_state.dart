@@ -17,7 +17,8 @@ class MyAppState extends ChangeNotifier {
   bool _loggedIn = false;
   bool get loggedIn => _loggedIn;
 
-  String _name = 'Vamsi Kalagaturu';
+  String _defaultName = 'Vamsi Kalagaturu';
+  late String _name = _defaultName;
   String _email = '';
 
   String get name => _name;
@@ -26,11 +27,11 @@ class MyAppState extends ChangeNotifier {
   late CollectionReference<Note> uNotesRef;
 
   void init() {
-    print('init called');
     _auth.authStateChanges().listen((User? user) {
       if (user == null) {
         print('User is currently signed out!');
         _loggedIn = false;
+        _name = _defaultName;
       } else {
         _loggedIn = true;
         print('User is signed in!');
@@ -53,6 +54,7 @@ class MyAppState extends ChangeNotifier {
             notifyListeners();
           } else {
             print('cant find username!');
+            _name = _defaultName;
           }
         });
       }
@@ -66,20 +68,22 @@ class MyAppState extends ChangeNotifier {
   // function to update user name
   bool updateName(String name) {
     bool success = false;
-    _firestore
-        .collection('users')
-        .doc(_auth.currentUser!.uid)
-        .update({'name': name})
-        .then((value) => {
-              print('name updated to $name'),
-              _name = name,
-              notifyListeners(),
-              success = true,
-            })
-        .onError((error, stackTrace) => {
-              print('Failed to update name: $error'),
-              success = false,
-            });
+    // if a user has a document in users collection update the name
+    // if not create a new document and update the name
+    
+    if (_auth.currentUser != null) {
+      _firestore.collection('users').doc(_auth.currentUser!.uid).set({
+        'name': name,
+      }).then((value) {
+        print('name updated successfully!');
+        _name = name;
+        success = true;
+        notifyListeners();
+      }).catchError((error) {
+        print('Failed to update name: $error');
+      });
+    }
+
     return success;
   }
 
