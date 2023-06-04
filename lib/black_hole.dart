@@ -74,8 +74,9 @@ class BlackholeButtonState extends State<BlackholeButton>
             },
             onWillAccept: (_) {
               _startAnimation();
+              return true;
             },
-            onLeave: () {
+            onLeave: (data) {
               _reverseAnimation();
             },
             builder: (_, __, child) {

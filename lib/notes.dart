@@ -61,30 +61,39 @@ class NoteWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          ListTile(
-            title: Text(note.title!),
-            trailing: IconButton(
-              // show pin icon if note is not pinned
-              icon: note.pinned
-                  ? Icon(Icons.push_pin_outlined)
-                  : Icon(Icons.push_pin),
-              onPressed: () {
-                pinNote();
-              },
-            ),
+      child: Container(
+        constraints: BoxConstraints(
+          minWidth: 100, // Minimum width
+        ),
+        child: IntrinsicHeight(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ListTile(
+                title: Text(note.title!),
+                trailing: IconButton(
+                  // show pin icon if note is not pinned
+                  icon: note.pinned
+                      ? Icon(Icons.push_pin_outlined)
+                      : Icon(Icons.push_pin),
+                  onPressed: () {
+                    pinNote();
+                  },
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Text(note.content),
+              ),
+            ],
           ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Text(note.content),
-          ),
-        ],
+        ),
       ),
     );
   }
 }
+
+
 
 // Notes grid widget using stream builder
 class NotesGrid extends StatelessWidget {
@@ -184,6 +193,19 @@ class NotesGrid extends StatelessWidget {
           .orderBy('timestamp', descending: true)
           .snapshots(),
       builder: (context, snapshot) {
+
+        // set cross axis count based on device width
+        int crossAxisCount = 4;
+        if (MediaQuery.of(context).size.width < 600) {
+          crossAxisCount = 2;
+        } else if (MediaQuery.of(context).size.width < 900) {
+          crossAxisCount = 3;
+        } else if (MediaQuery.of(context).size.width < 1200) {
+          crossAxisCount = 4;
+        } else {
+          crossAxisCount = 5;
+        }
+
         if (snapshot.hasError) {
           return SliverFillRemaining(child: Text('Something went wrong'));
         }
@@ -207,9 +229,10 @@ class NotesGrid extends StatelessWidget {
         // build grid view
         return SliverFillRemaining(
           child: GridView.custom(
+            shrinkWrap: true,
             padding: EdgeInsets.all(8),
             gridDelegate: SliverWovenGridDelegate.count(
-              crossAxisCount: 4,
+              crossAxisCount: crossAxisCount,
               mainAxisSpacing: 8,
               crossAxisSpacing: 8,
               pattern: [
