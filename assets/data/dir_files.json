@@ -1,0 +1,26 @@
+{
+    "dirs": {
+        "home": {
+            "path": "~",
+            "type": "dir",
+            "auth": false,
+            "dataSrc": "local",
+            "children": {
+                "dirs": {
+                    "notes": {
+                        "path": "~/notes",
+                        "type": "dir",
+                        "auth": true,
+                        "dataSrc": "firebase"
+                    }
+                },
+                "files": {
+                    "help.txt": {
+                        "path": "~",
+                        "type": "txt"
+                    }
+                }
+            }
+        }
+    }
+}

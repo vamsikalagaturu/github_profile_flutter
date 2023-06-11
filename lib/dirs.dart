@@ -1,4 +1,9 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:flutter/services.dart' show rootBundle;
+
+FirebaseAuth _auth = FirebaseAuth.instance;
 
 class File {
   // name of the file
@@ -7,167 +12,169 @@ class File {
   final String path;
   // file type
   final String type;
-  // file widget
-  final Widget widget;
 
   // constructor
-  File(this.name, this.path, this.type, this.widget);
+  File(this.name, this.path, this.type);
 }
 
-// directory class: can contain files and directories
+// directory class that parses a json file and creates a list of directories and files
 class Directory {
   // name of the directory
   final String name;
-  // path of the directory (default is /)
-  String path = '/';
-  // list of files in the directory
-  final List<File> files = [];
-  // list of directories in the directory
-  final List<Directory> directories = [];
+  // path of the directory
+  final String path;
+  // parent
+  final String parent;
+  // auth required
+  final bool authRequired;
+  // src of the directory
+  final String dataSrc;
+  // children containing files and directories
+  final Children children;
 
   // constructor
-  Directory(this.name, this.path);
+  Directory(this.name, this.path, this.parent, this.authRequired, this.dataSrc,
+      this.children);
 
-  // function to add file to the directory
-  void addFile(File file) {
-    // add file to the list of files
-    files.add(file);
+  // ovveride print method
+  @override
+  String toString() {
+    return 'Directory{name: $name, path: $path, authRequired: $authRequired, dataSrc: $dataSrc}';
   }
 
-  // function to add directory to the directory
-  void addDirectory(Directory directory) {
-    // set the path of the directory
-    directory.path = '$path/${directory.name}';
-    // add directory to the list of directories
-    directories.add(directory);
-  }
+  // get children (directories and files) as a list of strings
+  List<String> getChildren() {
+    // create a list of strings
+    List<String> childrenNames = [];
 
-  // function to get file from the directory if it exists else null
-  File? getFile(String name) {
-    // iterate through the list of files
-    for (var file in files) {
-      // if the file name is same as the name
-      if (file.name == name) {
-        // return the file
-        return file;
+    // loop through the children
+    for (final childDir in children.directories) {
+      // add the name of the directory to the list
+      // check if directory requires auth
+      if (childDir.authRequired && _auth.currentUser == null) {
+        continue;
       }
+      childrenNames.add('${childDir.name}/');
     }
-    // return null
-    return null;
+
+    for (final childFile in children.files) {
+      // add the name of the file to the list
+      childrenNames.add(childFile.name);
+    }
+
+    // return the list of strings
+    return childrenNames;
   }
 
-  // function to get directory from the directory if it exists else null
-  Directory? getDirectory(String name) {
-    // if name is . return this directory
-    if (name == '.') {
-      return this;
-    }
-    // if name contains / at the end remove it
-    if (name.endsWith('/')) {
-      name = name.substring(0, name.length - 1);
-    }
-    // iterate through the list of directories
-    for (var directory in directories) {
-      // if the directory name is same as the name
-      if (directory.name == name) {
-        // return the directory
-        return directory;
-      }
-    }
-    // return null
-    return null;
-  }
-
-  // function to check if the directory contains a file
-  bool containsFile(String name) {
-    // iterate through the list of files
-    for (var file in files) {
-      // if the file name is same as the name
-      if (file.name == name) {
+  // check if file or directory exists in children
+  bool hassDirectory(String name) {
+    // loop through the children
+    for (final childDir in children.directories) {
+      // if the name of the directory matches the name
+      if (childDir.name == name) {
         // return true
         return true;
       }
     }
+
     // return false
     return false;
   }
 
-  // function to check if the directory contains a directory
-  bool containsDirectory(String name) {
-    // iterate through the list of directories
-    for (var directory in directories) {
-      // if the directory name is same as the name
-      if (directory.name == name) {
+  bool hasFile(String name) {
+    // loop through the children
+    for (final childFile in children.files) {
+      // if the name of the file matches the name
+      if (childFile.name == name) {
         // return true
         return true;
       }
     }
+
     // return false
     return false;
   }
 
-  // get all files and directory names in the directory
-  List<String> getNames() {
-    // list of names
-    List<String> names = [];
-    // iterate through the list of files
-    for (var file in files) {
-      // add file name to the list of names
-      names.add(file.name);
-    }
-    // iterate through the list of directories
-    for (var directory in directories) {
-      // add directory name to the list of names and add / to the end
-      names.add('${directory.name}/');
-    }
-    // return the list of names
-    return names;
+
+}
+
+class Children {
+  final List<Directory> directories;
+  final List<File> files;
+
+  Children(this.directories, this.files);
+}
+
+// class to parse the json file and create a list of directories and files
+class DirsParser {
+  Map<String, dynamic> directoryStructure;
+
+  // constructor
+  DirsParser({required this.directoryStructure});
+
+  // parse the json file and create a list of directories and files
+  static Future<DirsParser> fromJsonFile(String path) async {
+    // Read the JSON file from the assets directory
+    final jsonString = await rootBundle.loadString(path);
+
+    // Decode the JSON data into a Dart object
+    final data = jsonDecode(jsonString);
+
+    final homeData = data["dirs"];
+
+    // parse the json data and create a list of directories and files
+    return DirsParser(directoryStructure: homeData);
   }
 
-  // getter to get the path of the directory
-  String get getPath => path;
+  // _parse method
+  List<Directory> parse(Map<String, dynamic> data, {String parent = ''}) {
+    // create a list of directories
+    List<Directory> dirs = [];
 
-  // get directory from path
-  Directory? getDirectoryFromPath(String path) {
-    // if path is / return this directory
-    if (path == '/') {
-      return this;
-    }
-    // if path contains / at the end remove it
-    if (path.endsWith('/')) {
-      path = path.substring(0, path.length - 1);
-    }
-    // split the path by /
-    List<String> pathList = path.split('/');
-    // if pathList is empty return null
-    if (pathList.isEmpty) {
-      return null;
-    }
-    // if pathList has only one element
-    if (pathList.length == 1) {
-      // iterate through the list of directories
-      for (var directory in directories) {
-        // if the directory name is same as the name
-        if (directory.name == pathList[0]) {
-          // return the directory
-          return directory;
+    // loop through the data
+    for (final dirEntry in data.entries) {
+      final dirName = dirEntry.key;
+      final dirPath = dirEntry.value['path'];
+      final dirAuth = dirEntry.value['auth'];
+      final dirDataSrc = dirEntry.value['dataSrc'];
+
+      Children dirChildren = Children([], []);
+
+      if (dirDataSrc == "local") {
+        // parse children
+        final children = dirEntry.value['children'];
+        final childDirs = children['dirs'];
+        final childFiles = children['files'];
+
+        // create a list of files
+        List<File> files = [];
+        if (childFiles != null) {
+          for (final file in childFiles.entries) {
+            files.add(File(file.key, file.value['path'], file.value['type']));
+          }
         }
-      }
-      // return null
-      return null;
-    }
-    // if pathList has more than one element
-    else {
-      // iterate through the list of directories
-      for (var directory in directories) {
-        // if the directory name is same as the name
-        if (directory.name == pathList[0]) {
-          // return the directory
-          return directory.getDirectoryFromPath(pathList.sublist(1).join('/'));
+
+        // create a list of child directories recursively
+        List<Directory> childDirectories = [];
+        if (childDirs != null) {
+          childDirectories = parse(childDirs, parent: dirName);
         }
+
+        // add the files and child directories to the list of children
+        dirChildren.directories.addAll(childDirectories);
+        dirChildren.files.addAll(files);
+      } else {
+        dirChildren = Children([], []);
       }
-      // return null
-      return null;
+
+      // create a directory object
+      final dir = Directory(dirName, dirPath, parent, dirAuth, dirDataSrc, dirChildren);
+
+      // add the directory to the list of directories
+      dirs.add(dir);
     }
+
+    // return the list of directories
+    return dirs;
   }
 }

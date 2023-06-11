@@ -14,6 +14,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'dirs.dart';
 import 'two_link_manipulator.dart';
 import 'notes.dart';
 import 'custom_search_bar.dart';
@@ -41,7 +42,7 @@ void main() async {
 }
 
 class MyApp extends StatelessWidget {
-  GoRouter router(var dirs) {
+  GoRouter router() {
     return GoRouter(
       // set the initial path
       initialLocation: '/',
@@ -66,7 +67,7 @@ class MyApp extends StatelessWidget {
       },
 
       // set the path to home page
-      routes: _routes(dirs),
+      routes: _routes(),
 
       // set the path to unknown page
       errorPageBuilder: (context, state) {
@@ -76,7 +77,7 @@ class MyApp extends StatelessWidget {
     );
   }
 
-  List<GoRoute> _routes(dirs) => [
+  List<GoRoute> _routes() => [
         GoRoute(
           name: '404',
           path: '/404',
@@ -103,25 +104,19 @@ class MyApp extends StatelessWidget {
                   );
                 },
               ),
-
-              // watch for changes in dirs
-              for (var dir in dirs)
-                GoRoute(
-                  name: dir['name'],
-                  path: dir['path'],
-                  pageBuilder: (context, state) {
-                    return MaterialPage(
-                        child: MyNextPage(state.path,
-                            resultWidget: Center(child: Text(dir['name']))));
-                  },
-                ),
             ]),
         GoRoute(
-          path: '/home/:command',
+          path: '/home:command',
           pageBuilder: (context, state) {
-            print('aaaaa: ${state.fullPath}');
-            if (state.pathParameters['command'] == 'help') {
-              return MaterialPage(child: MyNextPage('help', resultWidget: Help()));
+            print('command: ${state.pathParameters['command']}');
+            if (state.pathParameters['command'] == ':help') {
+              return MaterialPage(
+                  child: MyNextPage('help', resultWidget: Help()));
+            } else if (state.pathParameters['command'] == ':ls') {
+              // get the dirs
+              var lsRes = context.read<MyAppState>().currentDir.getChildren();
+              return MaterialPage(
+                  child: MyNextPage('ls', resultWidget: CustomText(lsRes)));
             }
             return MaterialPage(
                 child: MyNextPage(state.pathParameters['command'],
@@ -133,7 +128,6 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    var dirs = context.read<MyAppState>().dirs;
     return MaterialApp.router(
         title: 'Vamsi Kalagaturu',
         theme: ThemeData(
@@ -142,7 +136,7 @@ class MyApp extends StatelessWidget {
           brightness: Brightness.dark,
           colorSchemeSeed: Colors.blue,
         ),
-        routerConfig: router(dirs));
+        routerConfig: router());
   }
 }
 
@@ -194,10 +188,11 @@ class CustomText extends StatelessWidget {
   const CustomText(this.text, {Key? key}) : super(key: key);
 
   // text
-  final String text;
+  final dynamic text;
 
   @override
   Widget build(BuildContext context) {
+    print(text);
     return Center(
       child: Container(
         // set the padding
@@ -220,7 +215,8 @@ class CustomText extends StatelessWidget {
         // set the child
         alignment: Alignment.center,
         child: Text(
-          text,
+          // handle single string and list of strings
+          text is String ? text : text.join('\t'),
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                 color: Theme.of(context).colorScheme.onPrimaryContainer,
@@ -276,7 +272,7 @@ class MyNextPage extends StatelessWidget {
     String nPath = path!;
     if (path!.contains('ls')) {
       // delete the string after :
-      nPath = nPath.substring(0, nPath.indexOf(':')).replaceFirst('home', '~');
+      nPath = '~';
     } else if (path == '/') {
       nPath = '~';
     } else {

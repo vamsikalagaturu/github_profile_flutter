@@ -159,21 +159,8 @@ _onSubmitted(BuildContext context, String value, Function? touchMethod) {
 
     print('path is $path');
 
-    List dirs = context.read<MyAppState>().dirs;
-
-    bool isPath = false;
-
-    for (var dir in dirs) {
-      if (dir['name'] == path) {
-        isPath = true;
-        break;
-      }
-    }
-
     if (path == 'notes') {
       context.pushNamed('notes');
-    } else if (isPath) {
-      context.pushNamed(path);
     } else if (path.contains('ls')) {
       context.push('/home:ls');
     } else if (path == 'sudo su') {
@@ -224,7 +211,7 @@ _onSubmitted(BuildContext context, String value, Function? touchMethod) {
     } else if (path == 'touch') {
       touchMethod!();
     } else if (path == 'help') {
-      context.push(Uri(path: '/home/help').toString());
+      context.push(Uri(path: '/home:help').toString());
     } else {
       context.pushNamed('404');
     }

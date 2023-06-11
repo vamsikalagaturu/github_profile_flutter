@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'dirs.dart';
 import 'notes.dart' show Note;
 
 final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -24,9 +25,18 @@ class MyAppState extends ChangeNotifier {
   String get name => _name;
   String get email => _email;
 
+  late Directory homeDir;
+  
+  late Directory _currentDir;
+  Directory get currentDir => _currentDir;
+
+  late String _currentPath;
+  // getter for current path
+  String get currentPath => _currentPath;
+
   late CollectionReference<Note> uNotesRef;
 
-  void init() {
+  void init() async {
     _auth.authStateChanges().listen((User? user) {
       if (user == null) {
         _loggedIn = false;
@@ -58,8 +68,15 @@ class MyAppState extends ChangeNotifier {
       notifyListeners();
     });
 
-    // print documents in home collection
-    printDocs();
+    // get stuff from json
+    final dirsParser = await DirsParser.fromJsonFile('data/dir_files.json');
+
+    // get dirs
+    homeDir = dirsParser.parse(dirsParser.directoryStructure)[0];
+
+    // variable to store the current path
+    _currentPath = homeDir.path;
+    _currentDir = homeDir;
   }
 
   // function to update user name
@@ -84,19 +101,7 @@ class MyAppState extends ChangeNotifier {
     return success;
   }
 
-  // variable to store the current path
-  String _currentPath = '~/';
-
   bool show404 = false;
-
-  // getter for current path
-  String get currentPath => _currentPath;
-
-  List dirs = [
-    {'name': 'about', 'path': 'about'},
-    {'name': 'projects', 'path': 'projects'},
-    {'name': 'contact', 'path': 'contact'}
-  ];
 
   // define the controller for the text field of terminal
   final TextEditingController _terminalTextController = TextEditingController();
