@@ -5,6 +5,7 @@ var helpText = "Available commands:\n"
     "cd dir_name : change directory\n"
     "su - email : login as user\n"
     "sudo passwd reset : reset password\n"
+    "sudo passwd reset -u email : forgot password\n"
     "logout : logout\n"
     "sudo usermod -l new_name : change username\n"
     "touch : create a new instance of a widget in current context\n";

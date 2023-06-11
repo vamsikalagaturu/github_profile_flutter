@@ -29,12 +29,10 @@ class MyAppState extends ChangeNotifier {
   void init() {
     _auth.authStateChanges().listen((User? user) {
       if (user == null) {
-        print('User is currently signed out!');
         _loggedIn = false;
         _name = _defaultName;
       } else {
         _loggedIn = true;
-        print('User is signed in!');
         _email = user.email!;
         // docref for user notes
         uNotesRef = _firestore
@@ -50,11 +48,10 @@ class MyAppState extends ChangeNotifier {
         _firestore.collection('users').doc(user.uid).get().then((doc) {
           if (doc.exists) {
             _name = doc.data()!['name'];
-            print('user name: $_name');
             notifyListeners();
           } else {
-            print('cant find username!');
-            _name = _defaultName;
+            _name = '';
+            notifyListeners();
           }
         });
       }
@@ -70,7 +67,7 @@ class MyAppState extends ChangeNotifier {
     bool success = false;
     // if a user has a document in users collection update the name
     // if not create a new document and update the name
-    
+
     if (_auth.currentUser != null) {
       _firestore.collection('users').doc(_auth.currentUser!.uid).set({
         'name': name,

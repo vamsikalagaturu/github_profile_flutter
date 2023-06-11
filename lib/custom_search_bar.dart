@@ -197,7 +197,17 @@ _onSubmitted(BuildContext context, String value, Function? touchMethod) {
             email: Provider.of<MyAppState>(context, listen: false).email);
       } else {
         // display modal
-        _showLoginModal(context, '');
+        String email = path.split('_')[3];
+        if (email != '') {
+          // send the reset link to the email
+          _auth.sendPasswordResetEmail(email: email);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('A password reset link is sent to your email!, '
+                  'Follow the instructions in the email to reset your password'),
+            ),
+          );
+        }
       }
     } else if (path == 'logout') {
       // logout the user
@@ -286,7 +296,13 @@ String interpretCommand(String value, BuildContext context) {
   }
   // to reset password
   if (value.startsWith('sudo passwd reset')) {
-    return 'passwd_reset';
+    // return 'passwd_reset';
+    if (value.contains('-u')) {
+      var email = value.split(' ')[4];
+      return 'passwd_reset_u_$email';
+    } else {
+      return 'passwd_reset';
+    }
   }
   // to logout
   if (value.startsWith('logout')) {
@@ -359,6 +375,13 @@ void _showLoginModal(BuildContext context, String email) {
                       if (value) {
                         // close the modal
                         Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                                'Login Successful! Update your name if not updated.'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
                       } else {
                         // show the snackbar
                         ScaffoldMessenger.of(context).showSnackBar(
