@@ -227,29 +227,29 @@ class NotesGrid extends StatelessWidget {
         }).toList();
 
         // build grid view
-        return SliverFillRemaining(
-          child: GridView.custom(
-            shrinkWrap: true,
-            padding: EdgeInsets.all(8),
-            gridDelegate: SliverWovenGridDelegate.count(
-              crossAxisCount: crossAxisCount,
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
-              pattern: [
-                WovenGridTile(1),
-                WovenGridTile(
-                  5 / 7,
-                  crossAxisRatio: 0.9,
-                  alignment: AlignmentDirectional.centerEnd,
-                ),
-              ],
-            ),
-            childrenDelegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final note = notes[index];
-                return GestureDetector(
+        return SliverPadding(
+          padding: EdgeInsets.all(8),
+          sliver: SliverMasonryGrid.count(
+            crossAxisCount: crossAxisCount,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childCount: notes.length,
+            itemBuilder: (context, index) {
+              final note = notes[index];
+              return GestureDetector(
                   onTap: () {
-                    updateNoteById(note.id!, context);
+                    // updateNoteById(note.id!, context);
+                    // open edit note page
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => EditNotePage(
+                          firestore: firestore,
+                          uid: uid,
+                          note: note,
+                        ),
+                      ),
+                    );
                   },
                   child: Draggable<Note>(
                     data: note,
@@ -292,9 +292,7 @@ class NotesGrid extends StatelessWidget {
                     ),
                   ),
                 );
-              },
-              childCount: notes.length,
-            ),
+            }
           ),
         );
       },
@@ -437,6 +435,73 @@ class NotesPage extends StatelessWidget {
         ],
       ),
       floatingActionButton: BlackholeButton(onAcceptMethod: deleteNote),
+    );
+  }
+}
+
+// edit note page
+class EditNotePage extends StatelessWidget {
+  final FirebaseFirestore firestore;
+  final String uid;
+  final Note note;
+
+  EditNotePage({required this.firestore, required this.uid, required this.note});
+
+  @override
+  Widget build(BuildContext context) {
+    // text editing controllers
+    final titleController = TextEditingController(text: note.title);
+    final contentController = TextEditingController(text: note.content);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Edit note'),
+        actions: [
+          IconButton(
+            onPressed: () {
+              // update note
+              firestore
+                  .collection('users')
+                  .doc(uid)
+                  .collection('notes')
+                  .doc(note.id)
+                  .update({
+                'title': titleController.text,
+                'content': contentController.text,
+              });
+              Navigator.pop(context);
+            },
+            icon: Icon(Icons.check),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // customize the text field to look like a note
+          TextField(
+            controller: titleController,
+            decoration: InputDecoration(
+              hintText: 'Title',
+              border: InputBorder.none,
+            ),
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          // horizontal line
+          Divider(),
+          TextField(
+            controller: contentController,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: 'Content',
+              border: InputBorder.none,
+            ),
+            maxLines: null,
+          ),
+        ],
+      ),
     );
   }
 }
