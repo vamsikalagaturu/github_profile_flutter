@@ -337,13 +337,6 @@ class MobileManipulatorState extends State<MobileManipulator>
         double parentHeight = constraints.maxHeight;
 
         return GestureDetector(
-          onTapDown: (TapDownDetails details) {
-            double dx = details.localPosition.dx - cubeX;
-            double dy = details.localPosition.dy - cubeY!;
-            if (dx * dx + dy * dy <= cubeDimension * cubeDimension) {
-              isDragging = true;
-            }
-          },
           onPanDown: (DragDownDetails details) {
             double dx = details.localPosition.dx - cubeX;
             double dy = details.localPosition.dy - cubeY!;
@@ -358,11 +351,17 @@ class MobileManipulatorState extends State<MobileManipulator>
                 double newCubeY = (cubeY ?? 0) + details.delta.dy;
 
                 // Check if the new position is within the parent's bounds
-                if (newCubeX >= 0 && newCubeX <= parentWidth - cubeDimension) {
+                if (newCubeX >= 0 &&
+                    newCubeX <= parentWidth - cubeDimension - 50) {
                   cubeX = newCubeX;
                 }
+                // if newCubeY is crossing the parent, then set it to parent boundary
                 if (newCubeY >= 0 && newCubeY <= parentHeight - cubeDimension) {
                   cubeY = newCubeY;
+                } else if (newCubeY < 0) {
+                  cubeY = 0;
+                } else {
+                  cubeY = parentHeight - cubeDimension;
                 }
               });
             }
