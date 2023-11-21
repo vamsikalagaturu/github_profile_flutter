@@ -5,17 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:io_page/assets/icons/custom_icons_icons.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dirs.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-import 'dirs.dart';
 import 'two_link_manipulator.dart';
+import 'mobile_manipulator.dart';
 import 'notes.dart';
 import 'custom_search_bar.dart';
 import 'help.dart';
@@ -160,21 +156,28 @@ class MyHomePage extends StatelessWidget {
               child: CustomSearchBar('~'),
             ),
             SizedBox(
-              height: 10,
+              height: 50,
             ),
+            // MobileManipulator(),
             Container(
-                constraints: BoxConstraints(
-                  minWidth: 300,
-                  minHeight: 300,
-                ),
+                // constraints: BoxConstraints(
+                //   minWidth: 300,
+                //   minHeight: 300,
+                // ),
                 decoration: BoxDecoration(
-                  color: const Color.fromARGB(255, 94, 95, 96),
+                  color: Color.fromARGB(255, 214, 217, 220),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 // set height and width of the container dynamically
-                height: 300,
-                width: 300,
-                child: TwoLinkManipulator()),
+                height: 280,
+                // full width
+                width: MediaQuery.of(context).size.width * 0.9,
+                // child: TwoLinkManipulator()
+                // child: MobileManipulator()),
+                // if width is less than 600 use two link manipulator
+                child: MediaQuery.of(context).size.width < 600
+                    ? TwoLinkManipulator()
+                    : MobileManipulator()),
           ],
         ),
       ),
@@ -278,8 +281,10 @@ class MyNextPage extends StatelessWidget {
     } else {
       nPath = '~/$nPath';
     }
-    return WillPopScope(
-      onWillPop: () => onBackPress(context),
+    return PopScope(
+      onPopInvoked: (bool value) async {
+        await onBackPress(context);
+      },
       child: Scaffold(
           // body is the majority of the screen.
           body: CustomScrollView(
